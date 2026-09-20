@@ -148,7 +148,29 @@ function Check-Ollama {
 # ── Try binary install first ──
 $binary = "lv-windows-${arch}.exe"
 # Binaries are served from the public assets repo (SPEC_EXTERNAL_RESEARCH 2026-09-08 §4): the code repo is private.
-$url = "https://github.com/lingua-viva/linguaviva.art/releases/latest/download/$binary"
+#
+# Release resolution: the desktop app's releases (tags desktop-v*) live in that
+# same repo, and "releases/latest" resolves REPO-WIDE to whichever train
+# published last. On 2026-09-20 that was desktop-v0.2.106, which carries no
+# lv-* binary, so this download 404'd for everyone. Resolve the CLI train
+# (tag v*) explicitly; fall back to "latest" only if the list is unreachable.
+$releasesApi = "https://api.github.com/repos/lingua-viva/linguaviva.art/releases?per_page=20"
+$cliTag = ""
+try {
+    $response = Invoke-RestMethod -Uri $releasesApi -UseBasicParsing -ErrorAction Stop
+    foreach ($release in $response) {
+        if ($release.tag_name -like "v*") {
+            $cliTag = $release.tag_name
+            break
+        }
+    }
+} catch {}
+
+if ($cliTag) {
+    $url = "https://github.com/lingua-viva/linguaviva.art/releases/download/$cliTag/$binary"
+} else {
+    $url = "https://github.com/lingua-viva/linguaviva.art/releases/latest/download/$binary"
+}
 
 Write-Host "  → Attempting binary download..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null

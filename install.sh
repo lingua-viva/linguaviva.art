@@ -268,7 +268,25 @@ PLISTEOF
 # ── Try binary install first ──
 BINARY="lv-${PLATFORM}-${ARCH}"
 # Binaries are served from the public assets repo (SPEC_EXTERNAL_RESEARCH 2026-09-08 §4): the code repo is private.
-URL="https://github.com/lingua-viva/linguaviva.art/releases/latest/download/${BINARY}"
+#
+# Release resolution: the desktop app's releases (tags desktop-v*) live in that
+# same repo, and "releases/latest" is resolved REPO-WIDE to the most recent
+# non-prerelease — whichever train published last. On 2026-09-20 that was
+# desktop-v0.2.106, which carries no lv-* binary at all, so every one of these
+# downloads 404'd and the script fell through to cloning a private repo and
+# exiting 1. The CLI binaries were on v1.0.6 the whole time; nothing pointed at
+# them. Resolve the CLI train (tag v*) explicitly, and fall back to "latest"
+# only when the release list itself cannot be reached.
+RELEASES_API="https://api.github.com/repos/lingua-viva/linguaviva.art/releases?per_page=20"
+CLI_TAG=$(curl -fsSL "$RELEASES_API" 2>/dev/null \
+  | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"v[0-9][^"]*"' \
+  | head -1 \
+  | sed 's/.*"\(v[0-9][^"]*\)"/\1/')
+if [ -n "$CLI_TAG" ]; then
+  URL="https://github.com/lingua-viva/linguaviva.art/releases/download/${CLI_TAG}/${BINARY}"
+else
+  URL="https://github.com/lingua-viva/linguaviva.art/releases/latest/download/${BINARY}"
+fi
 TMPFILE=$(mktemp)
 if [ -z "$SKIP_BINARY" ]; then
   echo "  → Downloading binary..."
